@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en-AU">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nutrition Tracker</title>
+<style>
+  :root { --bg:#fafaf8; --card:#fff; --ink:#1c1c1a; --muted:#6b6b66; --line:#e4e3dd; --accent:#1d9e75; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, sans-serif; margin:0; background:var(--bg); color:var(--ink); line-height:1.5; }
+  main { max-width:640px; margin:0 auto; padding:1rem; }
+  h1 { font-size:1.3rem; font-weight:600; }
+  h2 { font-size:1rem; font-weight:600; margin:1.5rem 0 .5rem; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1rem; margin-bottom:1rem; }
+  .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
+  .datebar { justify-content:space-between; }
+  input, button, select { font:inherit; padding:.5rem .6rem; border:1px solid var(--line); border-radius:8px; background:#fff; }
+  input[type=number] { width:5.5rem; }
+  button { cursor:pointer; background:var(--accent); color:#fff; border:none; }
+  button.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
+  .totals { display:flex; gap:2rem; font-size:1.1rem; }
+  .totals b { display:block; font-size:1.6rem; }
+  .entry, .libitem { display:flex; justify-content:space-between; align-items:center; padding:.5rem 0; border-bottom:1px solid var(--line); }
+  .entry:last-child, .libitem:last-child { border:none; }
+  .meta { color:var(--muted); font-size:.85rem; }
+  .del { background:none; color:var(--muted); border:none; padding:.2rem .4rem; }
+  .grid { display:grid; grid-template-columns:1fr auto auto auto auto; gap:.4rem; align-items:center; }
+  .empty { color:var(--muted); padding:.5rem 0; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Nutrition Tracker</h1>
+
+  <div class="card row datebar">
+    <button class="ghost" onclick="shiftDay(-1)">← Prev</button>
+    <input type="date" id="date" onchange="render()">
+    <button class="ghost" onclick="shiftDay(1)">Next →</button>
+  </div>
+
+  <div class="card">
+    <div class="totals">
+      <div>Calories <b id="tCal">0</b></div>
+      <div>Protein <b id="tPro">0 g</b></div>
+    </div>
+  </div>
+
+  <h2>Add food</h2>
+  <div class="card">
+    <div class="row" style="margin-bottom:.6rem">
+      <select id="libpick" onchange="fillFromLib()" style="flex:1">
+        <option value="">— quick add from library —</option>
+      </select>
+    </div>
+    <div class="grid">
+      <input id="fName" placeholder="Food name">
+      <input id="fQty" type="number" step="0.25" value="1" title="servings">
+      <input id="fCal" type="number" placeholder="kcal">
+      <input id="fPro" type="number" placeholder="protein g">
+      <button onclick="addEntry()">Add</button>
+    </div>
+    <label class="meta" style="display:block;margin-top:.5rem">
+      <input type="checkbox" id="fSave"> also save to library
+    </label>
+  </div>
+
+  <h2>Today's entries</h2>
+  <div class="card" id="entries"></div>
+
+  <h2>Food library</h2>
+  <div class="card" id="library"></div>
+</main>
+
+<script>
+/* ---- DATA LAYER: the only part you rewrite for Supabase ---- */
+const store = {
+  getDay(date)      { return JSON.parse(localStorage.getItem('day:'+date) || '[]'); },
+  saveDay(date, es) { localStorage.setItem('day:'+date, JSON.stringify(es)); },
+  getLibrary()      { return JSON.parse(localStorage.getItem('library') || '[]'); },
+  saveLibrary(lib)  { localStorage.setItem('library', JSON.stringify(lib)); },
+};
+
+/* ---- APP LOGIC ---- */
+const todayISO = () => new Date().toISOString().slice(0,10);
+const $ = id => document.getElementById(id);
+
+function shiftDay(n) {
+  const d = new Date($('date').value);
+  d.setDate(d.getDate() + n);
+  $('date').value = d.toISOString().slice(0,10);
+  render();
+}
+
+function addEntry() {
+  const name = $('fName').value.trim();
+  const qty  = parseFloat($('fQty').value) || 1;
+  const cal  = parseFloat($('fCal').value) || 0;
+  const pro  = parseFloat($('fPro').value) || 0;
+  if (!name) return;
+
+  const date = $('date').value;
+  const day = store.getDay(date);
+  day.push({ id: Date.now(), name, qty, cal: cal*qty, pro: pro*qty, unitCal: cal, unitPro: pro });
+  store.saveDay(date, day);
+
+  if ($('fSave').checked) {
+    const lib = store.getLibrary();
+    if (!lib.some(f => f.name.toLowerCase() === name.toLowerCase())) {
+      lib.push({ name, cal, pro });
+      store.saveLibrary(lib);
+    }
+  }
+  $('fName').value = ''; $('fCal').value = ''; $('fPro').value = ''; $('fQty').value = 1; $('fSave').checked = false;
+  render();
+}
+
+function deleteEntry(id) {
+  const date = $('date').value;
+  store.saveDay(date, store.getDay(date).filter(e => e.id !== id));
+  render();
+}
+
+function fillFromLib() {
+  const f = store.getLibrary()[$('libpick').value];
+  if (!f) return;
+  $('fName').value = f.name; $('fCal').value = f.cal; $('fPro').value = f.pro;
+  $('libpick').value = '';
+}
+
+function deleteLibItem(i) {
+  const lib = store.getLibrary(); lib.splice(i,1); store.saveLibrary(lib); render();
+}
+
+function render() {
+  const date = $('date').value;
+  const day = store.getDay(date);
+  const lib = store.getLibrary();
+
+  $('tCal').textContent = Math.round(day.reduce((s,e)=>s+e.cal,0));
+  $('tPro').textContent = Math.round(day.reduce((s,e)=>s+e.pro,0)) + ' g';
+
+  $('entries').innerHTML = day.length ? day.map(e => `
+    <div class="entry">
+      <div><div>${e.name} <span class="meta">×${e.qty}</span></div>
+        <div class="meta">${Math.round(e.cal)} kcal · ${Math.round(e.pro)} g protein</div></div>
+      <button class="del" onclick="deleteEntry(${e.id})">✕</button>
+    </div>`).join('') : '<div class="empty">Nothing logged yet.</div>';
+
+  $('library').innerHTML = lib.length ? lib.map((f,i) => `
+    <div class="libitem">
+      <div>${f.name} <span class="meta">${f.cal} kcal · ${f.pro} g / serving</span></div>
+      <button class="del" onclick="deleteLibItem(${i})">✕</button>
+    </div>`).join('') : '<div class="empty">No saved foods yet. Tick "save to library" when adding.</div>';
+
+  $('libpick').innerHTML = '<option value="">— quick add from library —</option>' +
+    lib.map((f,i)=>`<option value="${i}">${f.name}</option>`).join('');
+}
+
+$('date').value = todayISO();
+render();
+</script>
+</body>
+</html>
