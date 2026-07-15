@@ -26,6 +26,7 @@
   .del { background:none; color:var(--muted); border:none; padding:.2rem .4rem; }
   .grid { display:grid; grid-template-columns:1fr auto auto auto auto; gap:.4rem; align-items:center; }
   .empty { color:var(--muted); padding:.5rem 0; }
+  .status { color:var(--muted); font-size:.85rem; }
 </style>
 </head>
 <body>
@@ -69,20 +70,51 @@
 
   <h2>Food library</h2>
   <div class="card" id="library"></div>
+  <p class="status" id="status"></p>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <script>
-/* ---- DATA LAYER: the only part you rewrite for Supabase ---- */
+/* ---- PASTE YOUR TWO VALUES HERE ---- */
+const SUPABASE_URL = 'https://wwspgwztdsgpsipxwpti.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_yXglqKiGasVaSdAGCieGng_y4-0o9WA';
+
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const $ = id => document.getElementById(id);
+const status = msg => $('status').textContent = msg;
+
+/* ---- DATA LAYER: now backed by Supabase ---- */
 const store = {
-  getDay(date)      { return JSON.parse(localStorage.getItem('day:'+date) || '[]'); },
-  saveDay(date, es) { localStorage.setItem('day:'+date, JSON.stringify(es)); },
-  getLibrary()      { return JSON.parse(localStorage.getItem('library') || '[]'); },
-  saveLibrary(lib)  { localStorage.setItem('library', JSON.stringify(lib)); },
+  async getDay(date) {
+    const { data, error } = await db.from('entries').select('*').eq('logged_on', date).order('created_at');
+    if (error) { status('Load error: ' + error.message); return []; }
+    return data;
+  },
+  async addEntry(e) {
+    const { error } = await db.from('entries').insert(e);
+    if (error) status('Save error: ' + error.message);
+  },
+  async deleteEntry(id) {
+    const { error } = await db.from('entries').delete().eq('id', id);
+    if (error) status('Delete error: ' + error.message);
+  },
+  async getLibrary() {
+    const { data, error } = await db.from('foods').select('*').order('name');
+    if (error) { status('Load error: ' + error.message); return []; }
+    return data;
+  },
+  async addFood(f) {
+    const { error } = await db.from('foods').insert(f);
+    if (error) status('Save error: ' + error.message);
+  },
+  async deleteFood(id) {
+    const { error } = await db.from('foods').delete().eq('id', id);
+    if (error) status('Delete error: ' + error.message);
+  },
 };
 
 /* ---- APP LOGIC ---- */
 const todayISO = () => new Date().toISOString().slice(0,10);
-const $ = id => document.getElementById(id);
 
 function shiftDay(n) {
   const d = new Date($('date').value);
@@ -91,69 +123,61 @@ function shiftDay(n) {
   render();
 }
 
-function addEntry() {
+async function addEntry() {
   const name = $('fName').value.trim();
   const qty  = parseFloat($('fQty').value) || 1;
   const cal  = parseFloat($('fCal').value) || 0;
   const pro  = parseFloat($('fPro').value) || 0;
   if (!name) return;
 
-  const date = $('date').value;
-  const day = store.getDay(date);
-  day.push({ id: Date.now(), name, qty, cal: cal*qty, pro: pro*qty, unitCal: cal, unitPro: pro });
-  store.saveDay(date, day);
+  await store.addEntry({ logged_on: $('date').value, name, qty, cal: cal*qty, protein: pro*qty });
 
   if ($('fSave').checked) {
-    const lib = store.getLibrary();
+    const lib = await store.getLibrary();
     if (!lib.some(f => f.name.toLowerCase() === name.toLowerCase())) {
-      lib.push({ name, cal, pro });
-      store.saveLibrary(lib);
+      await store.addFood({ name, cal, protein: pro });
     }
   }
   $('fName').value = ''; $('fCal').value = ''; $('fPro').value = ''; $('fQty').value = 1; $('fSave').checked = false;
   render();
 }
 
-function deleteEntry(id) {
-  const date = $('date').value;
-  store.saveDay(date, store.getDay(date).filter(e => e.id !== id));
-  render();
-}
+async function deleteEntry(id) { await store.deleteEntry(id); render(); }
+async function deleteLibItem(id) { await store.deleteFood(id); render(); }
 
+let libCache = [];
 function fillFromLib() {
-  const f = store.getLibrary()[$('libpick').value];
+  const f = libCache.find(x => x.id == $('libpick').value);
   if (!f) return;
-  $('fName').value = f.name; $('fCal').value = f.cal; $('fPro').value = f.pro;
+  $('fName').value = f.name; $('fCal').value = f.cal; $('fPro').value = f.protein;
   $('libpick').value = '';
 }
 
-function deleteLibItem(i) {
-  const lib = store.getLibrary(); lib.splice(i,1); store.saveLibrary(lib); render();
-}
-
-function render() {
+async function render() {
+  status('Loading…');
   const date = $('date').value;
-  const day = store.getDay(date);
-  const lib = store.getLibrary();
+  const [day, lib] = await Promise.all([store.getDay(date), store.getLibrary()]);
+  libCache = lib;
 
-  $('tCal').textContent = Math.round(day.reduce((s,e)=>s+e.cal,0));
-  $('tPro').textContent = Math.round(day.reduce((s,e)=>s+e.pro,0)) + ' g';
+  $('tCal').textContent = Math.round(day.reduce((s,e)=>s+Number(e.cal),0));
+  $('tPro').textContent = Math.round(day.reduce((s,e)=>s+Number(e.protein),0)) + ' g';
 
   $('entries').innerHTML = day.length ? day.map(e => `
     <div class="entry">
       <div><div>${e.name} <span class="meta">×${e.qty}</span></div>
-        <div class="meta">${Math.round(e.cal)} kcal · ${Math.round(e.pro)} g protein</div></div>
+        <div class="meta">${Math.round(e.cal)} kcal · ${Math.round(e.protein)} g protein</div></div>
       <button class="del" onclick="deleteEntry(${e.id})">✕</button>
     </div>`).join('') : '<div class="empty">Nothing logged yet.</div>';
 
-  $('library').innerHTML = lib.length ? lib.map((f,i) => `
+  $('library').innerHTML = lib.length ? lib.map(f => `
     <div class="libitem">
-      <div>${f.name} <span class="meta">${f.cal} kcal · ${f.pro} g / serving</span></div>
-      <button class="del" onclick="deleteLibItem(${i})">✕</button>
+      <div>${f.name} <span class="meta">${f.cal} kcal · ${f.protein} g / serving</span></div>
+      <button class="del" onclick="deleteLibItem(${f.id})">✕</button>
     </div>`).join('') : '<div class="empty">No saved foods yet. Tick "save to library" when adding.</div>';
 
   $('libpick').innerHTML = '<option value="">— quick add from library —</option>' +
-    lib.map((f,i)=>`<option value="${i}">${f.name}</option>`).join('');
+    lib.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
+  status('');
 }
 
 $('date').value = todayISO();
