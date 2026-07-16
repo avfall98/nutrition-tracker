@@ -3,185 +3,232 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Nutrition Tracker</title>
+<title>Daily Tracker Dashboard</title>
 <style>
-  :root { --bg:#fafaf8; --card:#fff; --ink:#1c1c1a; --muted:#6b6b66; --line:#e4e3dd; --accent:#1d9e75; }
-  * { box-sizing: border-box; }
-  body { font-family: system-ui, sans-serif; margin:0; background:var(--bg); color:var(--ink); line-height:1.5; }
-  main { max-width:640px; margin:0 auto; padding:1rem; }
-  h1 { font-size:1.3rem; font-weight:600; }
-  h2 { font-size:1rem; font-weight:600; margin:1.5rem 0 .5rem; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:1rem; margin-bottom:1rem; }
-  .row { display:flex; gap:.5rem; align-items:center; flex-wrap:wrap; }
-  .datebar { justify-content:space-between; }
-  input, button, select { font:inherit; padding:.5rem .6rem; border:1px solid var(--line); border-radius:8px; background:#fff; }
-  input[type=number] { width:5.5rem; }
-  button { cursor:pointer; background:var(--accent); color:#fff; border:none; }
-  button.ghost { background:#fff; color:var(--ink); border:1px solid var(--line); }
-  .totals { display:flex; gap:2rem; font-size:1.1rem; }
-  .totals b { display:block; font-size:1.6rem; }
-  .entry, .libitem { display:flex; justify-content:space-between; align-items:center; padding:.5rem 0; border-bottom:1px solid var(--line); }
-  .entry:last-child, .libitem:last-child { border:none; }
-  .meta { color:var(--muted); font-size:.85rem; }
-  .del { background:none; color:var(--muted); border:none; padding:.2rem .4rem; }
-  .grid { display:grid; grid-template-columns:1fr auto auto auto auto; gap:.4rem; align-items:center; }
-  .empty { color:var(--muted); padding:.5rem 0; }
-  .status { color:var(--muted); font-size:.85rem; }
+  :root {
+    --bg:#0b1220; --card:#151e2e; --card2:#0f1a2b; --line:#243149;
+    --ink:#e5e9f0; --muted:#8a94a7; --purple:#818cf8; --green:#34d399;
+    --red:#f87171; --blue:#60a5fa; --accent:#6366f1;
+  }
+  * { box-sizing:border-box; }
+  body { font-family:system-ui,sans-serif; margin:0; background:var(--bg); color:var(--ink); line-height:1.5; }
+  main { max-width:1220px; margin:0 auto; padding:1.5rem; }
+  h1 { font-size:1.6rem; font-weight:700; margin:0; }
+  .sub { color:var(--muted); margin:.25rem 0 1.5rem; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:1.25rem; margin-bottom:1.25rem; }
+  .charts { display:grid; grid-template-columns:1fr 1fr; gap:1.25rem; }
+  @media (max-width:760px){ .charts { grid-template-columns:1fr; } }
+  .chart-title { text-align:center; font-weight:600; margin:0 0 .5rem; }
+  .chart-title.cal { color:var(--red); } .chart-title.pro { color:var(--green); }
+  .chart-wrap { position:relative; height:280px; }
+  h2 { font-size:1.15rem; font-weight:600; margin:.25rem 0 1rem; }
+  table { width:100%; border-collapse:collapse; }
+  th { text-align:left; font-size:.72rem; letter-spacing:.05em; text-transform:uppercase; color:var(--muted); font-weight:600; padding:.6rem .5rem; border-bottom:1px solid var(--line); }
+  th.num, td.num { text-align:left; }
+  td { padding:.7rem .5rem; border-bottom:1px solid var(--line); font-size:.92rem; }
+  tr.group td { color:var(--purple); font-weight:600; }
+  td.item { padding-left:1.5rem; }
+  .pct { color:var(--muted); }
+  .protein { color:var(--green); }
+  tr.group .pct { color:var(--ink); }
+  tr.total td { font-weight:600; }
+  .val-red { color:var(--red); } .val-blue { color:var(--blue); }
+  .controls { display:flex; flex-wrap:wrap; gap:.5rem; align-items:center; }
+  input, select, button { font:inherit; padding:.5rem .6rem; border:1px solid var(--line); border-radius:8px; background:var(--card2); color:var(--ink); }
+  input[type=number]{ width:5rem; } input::placeholder{ color:var(--muted); }
+  button { cursor:pointer; background:var(--accent); border:none; color:#fff; font-weight:500; }
+  button.ghost { background:var(--card2); border:1px solid var(--line); color:var(--ink); }
+  .del { background:none; border:none; color:var(--muted); cursor:pointer; }
+  .status { color:var(--muted); font-size:.85rem; min-height:1.2em; }
+  .lbl { color:var(--muted); font-size:.85rem; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Nutrition Tracker</h1>
+  <h1>Daily Tracker Dashboard</h1>
+  <div class="sub" id="targetLine"></div>
 
-  <div class="card row datebar">
-    <button class="ghost" onclick="shiftDay(-1)">← Prev</button>
-    <input type="date" id="date" onchange="render()">
-    <button class="ghost" onclick="shiftDay(1)">Next →</button>
+  <div class="charts">
+    <div class="card"><div class="chart-title cal" id="calTitle">Calorie Breakdown</div>
+      <div class="chart-wrap"><canvas id="calChart"></canvas></div></div>
+    <div class="card"><div class="chart-title pro" id="proTitle">Protein Breakdown</div>
+      <div class="chart-wrap"><canvas id="proChart"></canvas></div></div>
   </div>
 
   <div class="card">
-    <div class="totals">
-      <div>Calories <b id="tCal">0</b></div>
-      <div>Protein <b id="tPro">0 g</b></div>
+    <div class="controls" style="justify-content:space-between;margin-bottom:1rem">
+      <div class="controls">
+        <button class="ghost" onclick="shiftDay(-1)">← Prev</button>
+        <input type="date" id="date" onchange="render()">
+        <button class="ghost" onclick="shiftDay(1)">Next →</button>
+      </div>
     </div>
-  </div>
 
-  <h2>Add food</h2>
-  <div class="card">
-    <div class="row" style="margin-bottom:.6rem">
-      <select id="libpick" onchange="fillFromLib()" style="flex:1">
+    <div class="controls" style="margin-bottom:.6rem">
+      <select id="libpick" onchange="fillFromLib()" style="flex:1;min-width:180px">
         <option value="">— quick add from library —</option>
       </select>
     </div>
-    <div class="grid">
-      <input id="fName" placeholder="Food name">
-      <input id="fQty" type="number" step="0.25" value="1" title="servings">
+    <div class="controls" style="margin-bottom:.6rem">
+      <input id="fName" placeholder="Food item" style="flex:1;min-width:180px">
+      <select id="fMeal"></select>
+    </div>
+    <div class="controls" style="margin-bottom:.6rem">
+      <span class="lbl">Qty</span><input id="fQty" type="number" step="0.25" value="1">
       <input id="fCal" type="number" placeholder="kcal">
       <input id="fPro" type="number" placeholder="protein g">
+      <input id="fFat" type="number" placeholder="fat g">
+      <input id="fCarb" type="number" placeholder="carbs g">
       <button onclick="addEntry()">Add</button>
     </div>
-    <label class="meta" style="display:block;margin-top:.5rem">
-      <input type="checkbox" id="fSave"> also save to library
-    </label>
+    <label class="lbl"><input type="checkbox" id="fSave"> also save to library</label>
   </div>
 
-  <h2>Today's entries</h2>
-  <div class="card" id="entries"></div>
-
-  <h2>Food library</h2>
-  <div class="card" id="library"></div>
-  <p class="status" id="status"></p>
+  <div class="card">
+    <h2>Logged Items (Grouped with Subtotals)</h2>
+    <table>
+      <thead><tr>
+        <th>Food Item / Group</th><th class="num">Calories</th><th class="num">% of Cal Target</th>
+        <th class="num">Protein</th><th class="num">% of Protein Target</th><th class="num">Fat</th><th class="num">Carbs</th>
+      </tr></thead>
+      <tbody id="tbody"></tbody>
+    </table>
+    <p class="status" id="status"></p>
+  </div>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
 <script>
+/* ---- SETTINGS ---- */
+const CAL_TARGET = 2500;
+const PROTEIN_TARGET = 180;
+  
 /* ---- PASTE YOUR TWO VALUES HERE ---- */
 const SUPABASE_URL = 'https://wwspgwztdsgpsipxwpti.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_yXglqKiGasVaSdAGCieGng_y4-0o9WA';
 
+const MEAL_ORDER = ['Breakfast','Morning Snack','Lunch','Afternoon Snack','Dinner','Evening Snack','Other'];
+const CAL_COLORS = ['#f87171','#fb923c','#f472b6','#a78bfa','#facc15','#fb7185','#94a3b8'];
+const PRO_COLORS = ['#4ade80','#34d399','#2dd4bf','#22d3ee','#a3e635','#86efac','#94a3b8'];
+const CAL_REMAIN = '#3b82f6', PRO_REMAIN = '#f59e0b';
+
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const $ = id => document.getElementById(id);
-const status = msg => $('status').textContent = msg;
+const status = m => $('status').textContent = m;
+const n1 = x => Number(x).toFixed(1);
+const pct = (x,t) => (x/t*100).toFixed(2) + '%';
 
-/* ---- DATA LAYER: now backed by Supabase ---- */
+/* ---- DATA LAYER ---- */
 const store = {
-  async getDay(date) {
-    const { data, error } = await db.from('entries').select('*').eq('logged_on', date).order('created_at');
-    if (error) { status('Load error: ' + error.message); return []; }
-    return data;
-  },
-  async addEntry(e) {
-    const { error } = await db.from('entries').insert(e);
-    if (error) status('Save error: ' + error.message);
-  },
-  async deleteEntry(id) {
-    const { error } = await db.from('entries').delete().eq('id', id);
-    if (error) status('Delete error: ' + error.message);
-  },
-  async getLibrary() {
-    const { data, error } = await db.from('foods').select('*').order('name');
-    if (error) { status('Load error: ' + error.message); return []; }
-    return data;
-  },
-  async addFood(f) {
-    const { error } = await db.from('foods').insert(f);
-    if (error) status('Save error: ' + error.message);
-  },
-  async deleteFood(id) {
-    const { error } = await db.from('foods').delete().eq('id', id);
-    if (error) status('Delete error: ' + error.message);
-  },
+  async getDay(date){ const {data,error}=await db.from('entries').select('*').eq('logged_on',date).order('created_at'); if(error){status('Load error: '+error.message);return[];} return data; },
+  async addEntry(e){ const {error}=await db.from('entries').insert(e); if(error)status('Save error: '+error.message); },
+  async deleteEntry(id){ const {error}=await db.from('entries').delete().eq('id',id); if(error)status('Delete error: '+error.message); },
+  async getLibrary(){ const {data,error}=await db.from('foods').select('*').order('name'); if(error){status('Load error: '+error.message);return[];} return data; },
+  async addFood(f){ const {error}=await db.from('foods').insert(f); if(error)status('Save error: '+error.message); },
 };
 
-/* ---- APP LOGIC ---- */
+/* ---- APP ---- */
 const todayISO = () => new Date().toISOString().slice(0,10);
+let libCache = [], calChart, proChart;
 
-function shiftDay(n) {
-  const d = new Date($('date').value);
-  d.setDate(d.getDate() + n);
-  $('date').value = d.toISOString().slice(0,10);
-  render();
-}
+function shiftDay(n){ const d=new Date($('date').value); d.setDate(d.getDate()+n); $('date').value=d.toISOString().slice(0,10); render(); }
 
-async function addEntry() {
-  const name = $('fName').value.trim();
-  const qty  = parseFloat($('fQty').value) || 1;
-  const cal  = parseFloat($('fCal').value) || 0;
-  const pro  = parseFloat($('fPro').value) || 0;
-  if (!name) return;
-
-  await store.addEntry({ logged_on: $('date').value, name, qty, cal: cal*qty, protein: pro*qty });
-
-  if ($('fSave').checked) {
-    const lib = await store.getLibrary();
-    if (!lib.some(f => f.name.toLowerCase() === name.toLowerCase())) {
-      await store.addFood({ name, cal, protein: pro });
-    }
+async function addEntry(){
+  const name=$('fName').value.trim(); if(!name) return;
+  const q=parseFloat($('fQty').value)||1;
+  const cal=parseFloat($('fCal').value)||0, pro=parseFloat($('fPro').value)||0;
+  const fat=parseFloat($('fFat').value)||0, carb=parseFloat($('fCarb').value)||0;
+  await store.addEntry({ logged_on:$('date').value, name, meal:$('fMeal').value, qty:q,
+    cal:cal*q, protein:pro*q, fat:fat*q, carbs:carb*q });
+  if($('fSave').checked){
+    const lib=await store.getLibrary();
+    if(!lib.some(f=>f.name.toLowerCase()===name.toLowerCase()))
+      await store.addFood({ name, cal, protein:pro, fat, carbs:carb });
   }
-  $('fName').value = ''; $('fCal').value = ''; $('fPro').value = ''; $('fQty').value = 1; $('fSave').checked = false;
+  ['fName','fCal','fPro','fFat','fCarb'].forEach(id=>$(id).value=''); $('fQty').value=1; $('fSave').checked=false;
   render();
 }
+async function deleteEntry(id){ await store.deleteEntry(id); render(); }
 
-async function deleteEntry(id) { await store.deleteEntry(id); render(); }
-async function deleteLibItem(id) { await store.deleteFood(id); render(); }
-
-let libCache = [];
-function fillFromLib() {
-  const f = libCache.find(x => x.id == $('libpick').value);
-  if (!f) return;
-  $('fName').value = f.name; $('fCal').value = f.cal; $('fPro').value = f.protein;
-  $('libpick').value = '';
+function fillFromLib(){
+  const f=libCache.find(x=>x.id==$('libpick').value); if(!f) return;
+  $('fName').value=f.name; $('fCal').value=f.cal; $('fPro').value=f.protein; $('fFat').value=f.fat; $('fCarb').value=f.carbs;
+  $('libpick').value='';
 }
 
-async function render() {
+function drawChart(id, existing, groups, target, colors, remainColor, unit){
+  const consumed = groups.reduce((s,g)=>s+g.v,0);
+  const remain = Math.max(target-consumed,0);
+  const labels = groups.map(g=>`${g.name} (${unit==='kcal'?Math.round(g.v):n1(g.v)}${unit==='kcal'?' kcal':'g'})`);
+  const data = groups.map(g=>g.v);
+  labels.push(`Remaining (${unit==='kcal'?Math.round(remain):n1(remain)}${unit==='kcal'?' kcal':'g'})`);
+  data.push(remain);
+  const bg = groups.map((_,i)=>colors[i%colors.length]); bg.push(remainColor);
+  if(existing) existing.destroy();
+  return new Chart($(id), { type:'pie', data:{ labels, datasets:[{ data, backgroundColor:bg, borderColor:'#151e2e', borderWidth:2 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      plugins:{ legend:{ position:'bottom', labels:{ color:'#cbd5e1', font:{size:11}, boxWidth:12, padding:10 } } } } });
+}
+
+async function render(){
   status('Loading…');
-  const date = $('date').value;
-  const [day, lib] = await Promise.all([store.getDay(date), store.getLibrary()]);
-  libCache = lib;
+  const date=$('date').value;
+  const [day,lib]=await Promise.all([store.getDay(date),store.getLibrary()]);
+  libCache=lib;
 
-  $('tCal').textContent = Math.round(day.reduce((s,e)=>s+Number(e.cal),0));
-  $('tPro').textContent = Math.round(day.reduce((s,e)=>s+Number(e.protein),0)) + ' g';
+  const grouped={}; day.forEach(e=>{ (grouped[e.meal] ??= []).push(e); });
+  const meals=MEAL_ORDER.filter(m=>grouped[m]).concat(Object.keys(grouped).filter(m=>!MEAL_ORDER.includes(m)));
+  const sum=(arr,k)=>arr.reduce((s,e)=>s+Number(e[k]),0);
 
-  $('entries').innerHTML = day.length ? day.map(e => `
-    <div class="entry">
-      <div><div>${e.name} <span class="meta">×${e.qty}</span></div>
-        <div class="meta">${Math.round(e.cal)} kcal · ${Math.round(e.protein)} g protein</div></div>
-      <button class="del" onclick="deleteEntry(${e.id})">✕</button>
-    </div>`).join('') : '<div class="empty">Nothing logged yet.</div>';
+  let rows='';
+  meals.forEach(m=>{
+    const items=grouped[m];
+    const c=sum(items,'cal'), p=sum(items,'protein'), f=sum(items,'fat'), cb=sum(items,'carbs');
+    rows+=`<tr class="group"><td>${m.toUpperCase()} TOTAL</td>
+      <td class="num">${Math.round(c)}</td><td class="num pct">${pct(c,CAL_TARGET)}</td>
+      <td class="num protein">${n1(p)}g</td><td class="num pct">${pct(p,PROTEIN_TARGET)}</td>
+      <td class="num">${n1(f)}g</td><td class="num">${n1(cb)}g</td></tr>`;
+    items.forEach(e=>{
+      rows+=`<tr><td class="item">${e.name}<button class="del" onclick="deleteEntry(${e.id})" title="delete"> ✕</button></td>
+        <td class="num">${Math.round(e.cal)}</td><td class="num pct">${pct(e.cal,CAL_TARGET)}</td>
+        <td class="num protein">${n1(e.protein)}g</td><td class="num pct">${pct(e.protein,PROTEIN_TARGET)}</td>
+        <td class="num">${n1(e.fat)}g</td><td class="num">${n1(e.carbs)}g</td></tr>`;
+    });
+  });
 
-  $('library').innerHTML = lib.length ? lib.map(f => `
-    <div class="libitem">
-      <div>${f.name} <span class="meta">${f.cal} kcal · ${f.protein} g / serving</span></div>
-      <button class="del" onclick="deleteLibItem(${f.id})">✕</button>
-    </div>`).join('') : '<div class="empty">No saved foods yet. Tick "save to library" when adding.</div>';
+  const tC=sum(day,'cal'), tP=sum(day,'protein'), tF=sum(day,'fat'), tCb=sum(day,'carbs');
+  const rC=Math.max(CAL_TARGET-tC,0), rP=Math.max(PROTEIN_TARGET-tP,0);
+  rows+=`<tr class="total"><td>Current Total</td>
+    <td class="num val-red">${Math.round(tC).toLocaleString()}</td><td class="num pct">${pct(tC,CAL_TARGET)}</td>
+    <td class="num protein">${n1(tP)}g</td><td class="num pct">${pct(tP,PROTEIN_TARGET)}</td>
+    <td class="num">${n1(tF)}g</td><td class="num">${n1(tCb)}g</td></tr>
+    <tr class="total"><td>Daily Target</td>
+    <td class="num">${CAL_TARGET.toLocaleString()}</td><td class="num pct">100.00%</td>
+    <td class="num">${n1(PROTEIN_TARGET)}g</td><td class="num pct">100.00%</td><td class="num">--</td><td class="num">--</td></tr>
+    <tr class="total"><td>Remaining</td>
+    <td class="num val-blue">${Math.round(rC).toLocaleString()}</td><td class="num pct">${pct(rC,CAL_TARGET)}</td>
+    <td class="num val-blue">${n1(rP)}g</td><td class="num pct">${pct(rP,PROTEIN_TARGET)}</td><td class="num">--</td><td class="num">--</td></tr>`;
+  $('tbody').innerHTML = rows || '<tr><td colspan="7" style="color:var(--muted)">Nothing logged yet.</td></tr>';
 
-  $('libpick').innerHTML = '<option value="">— quick add from library —</option>' +
-    lib.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
+  $('calTitle').textContent=`Calorie Breakdown (${Math.round(tC).toLocaleString()} / ${CAL_TARGET.toLocaleString()} kcal)`;
+  $('proTitle').textContent=`Protein Breakdown (${n1(tP)} / ${n1(PROTEIN_TARGET)}g)`;
+
+  const calGroups=meals.map(m=>({name:m,v:sum(grouped[m],'cal')}));
+  const proGroups=meals.map(m=>({name:m,v:sum(grouped[m],'protein')}));
+  calChart=drawChart('calChart',calChart,calGroups,CAL_TARGET,CAL_COLORS,CAL_REMAIN,'kcal');
+  proChart=drawChart('proChart',proChart,proGroups,PROTEIN_TARGET,PRO_COLORS,PRO_REMAIN,'g');
+
+  $('libpick').innerHTML='<option value="">— quick add from library —</option>'+lib.map(f=>`<option value="${f.id}">${f.name}</option>`).join('');
   status('');
 }
 
-$('date').value = todayISO();
+$('targetLine').textContent=`Targets: ${CAL_TARGET.toLocaleString()} kcal | ${PROTEIN_TARGET}g Protein`;
+$('fMeal').innerHTML=MEAL_ORDER.map(m=>`<option${m==='Lunch'?' selected':''}>${m}</option>`).join('');
+$('date').value=todayISO();
 render();
 </script>
 </body>
 </html>
+
+
